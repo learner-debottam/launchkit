@@ -1,0 +1,44 @@
+name: Build & Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 4️⃣ Lint
+      - name: Lint code
+        run: npm run lint
+
+      # 5️⃣ Build Next.js project
+      - name: Build project
+        run: npm run build
+
+      # 6️⃣ Deploy to Vercel
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v23
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: .
+          vercel-args: "--prod"
+
