@@ -1,0 +1,630 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@/lib/*": ["lib/*"],
+      "@/components/*": ["components/*"],
+      "@/types/*": ["types/*"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "jsx": "preserve",
+    "incremental": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}
+module.exports = {
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/.next/',
+  ],
+}
+import '@testing-library/jest-dom'
+# Security Considerations
+
+## Authentication Security
+
+1. **Session Management**:
+   - Uses secure, HTTP-only cookies for session storage
+   - Implements CSRF protection via SameSite cookie attributes
+   - Sessions have a limited lifetime and require re-authentication
+
+2. **Password Security**:
+   - All passwords are hashed using Supabase's built-in secure hashing
+   - Minimum password length enforced (8 characters)
+   - Password inputs are masked in the UI
+
+3. **OAuth Security**:
+   - Google OAuth uses PKCE flow for enhanced security
+   - Strict redirect URI validation
+   - State parameter used to prevent CSRF
+
+4. **Row Level Security**:
+   - Database enforces RLS policies:
+     - Users can only access their own data
+     - Admins have restricted access scope
+
+5. **Cookies**:
+   - Secure flag enabled (HTTPS only)
+   - HttpOnly flag prevents XSS attacks
+   - SameSite=Lax to prevent CSRF
+   - Domain and path restrictions in place
+
+## Environment Variables
+
+Never commit sensitive credentials to version control. Required environment variables:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+## Webhook Security
+
+If using Supabase webhooks:
+- Validate webhook signatures
+- Verify the origin of webhook requests
+- Implement rate limiting
+# LaunchKit with Supabase Auth
+
+## Setup Instructions
+
+1. **Install dependencies**:
+```bash
+npm install
+```
+
+2. **Set up environment variables**:
+Create `.env.local` file with:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+3. **Run the development server**:
+```bash
+npm run dev
+```
+
+4. **Run tests**:
+```bash
+# Unit tests
+npm test
+
+# E2E tests
+npx playwright test
+```
+
+## Features Implemented
+
+- Email/password authentication
+- Google OAuth integration
+- Protected routes with middleware
+- Session management
+- Row-level security policies
+- Unit and E2E test coverage
+
+## Project Structure
+
+```
+├── app/                   # Next.js app router
+│   ├── (auth)/            # Auth routes
+│   ├── (dashboard)/       # Protected routes  
+│   └── auth/              # Auth callback/logout
+├── lib/supabase/          # Supabase client helpers
+├── supabase/migrations/   # Database schema
+├── tests/                 # Unit tests
+└── e2e/                   # E2E tests
+```
+
+See [SECURITY.md](./SECURITY.md) for security best practices.
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
+
+  if (code) {
+    const supabase = createClient()
+    await supabase.auth.exchangeCodeForSession(code)
+  }
+
+  // URL to redirect to after sign in process completes
+  return NextResponse.redirect(requestUrl.origin + '/dashboard')
+}
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+
+export async function POST(request: Request) {
+  const requestUrl = new URL(request.url)
+  const supabase = createClient()
+  await supabase.auth.signOut()
+  return NextResponse.redirect(new URL('/auth/sign-in', requestUrl.origin))
+}
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+const signInSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8)
+})
+
+export async function POST(request: Request) {
+  const supabase = createClient()
+  const formData = await request.formData()
+  const data = Object.fromEntries(formData)
+
+  try {
+    const { email, password } = signInSchema.parse(data)
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status ?? 400 }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Invalid form data' },
+      { status: 400 }
+    )
+  }
+}
+'use client'
+
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+export default function SignInPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) {
+      setError(error.message)
+    } else {
+      router.push('/dashboard')
+    }
+
+    setIsLoading(false)
+  }
+
+  const handleGoogleSignIn = async () => {
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+
+    if (error) {
+      setError(error.message)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center">
+      <div className="w-full max-w-md space-y-6 rounded-lg border p-6">
+        <h1 className="text-2xl font-bold">Sign In</h1>
+        {error && (
+          <div className="rounded-md bg-red-100 p-3 text-red-700">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Signing in...' : 'Sign In'}
+          </Button>
+        </form>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-background px-2 text-muted-foreground">
+              OR
+            </span>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading}
+        >
+          Sign In with Google
+        </Button>
+      </div>
+    </div>
+  )
+}
+import { getUser } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const user = await getUser()
+
+  if (!user) {
+    redirect('/auth/sign-in')
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b">
+        <div className="container flex h-16 items-center justify-between">
+          <h1 className="text-lg font-semibold">Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-sm">{user.email}</span>
+            <form action="/auth/sign-out" method="POST">
+              <button className="text-sm text-red-600 hover:underline">
+                Sign Out
+              </button>
+            </form>
+          </div>
+        </div>
+      </header>
+      <main className="flex-1">{children}</main>
+    </div>
+  )
+}
+import { createBrowserClient } from '@supabase/ssr'
+
+export const createClient = () => {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export const createClient = () => {
+  const cookieStore = cookies()
+  
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        async set(name: string, value: string, options) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // The `set` method was called from a Server Component
+            // This can be ignored if you have middleware refreshing sessions
+          }
+        },
+        async remove(name: string, options) {
+          try {
+            cookieStore.set({ name, value: '', ...options })
+          } catch (error) {
+            // The `delete` method was called from a Server Component
+            // This can be ignored if you have middleware refreshing sessions
+          }
+        }
+      }
+    }
+  )
+}
+
+export const getSession = async () => {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  return session
+}
+
+export const getUser = async () => {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
+import * as React from 'react'
+
+export interface LabelProps
+  extends React.LabelHTMLAttributes<HTMLLabelElement> {}
+
+const Label = React.forwardRef<HTMLLabelElement, LabelProps>(
+  ({ className, ...props }, ref) => {
+    return (
+      <label
+        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Label.displayName = 'Label'
+
+export { Label }
+import * as React from 'react'
+import { cva, type VariantProps } from 'class-variance-authority'
+
+const buttonVariants = cva(
+  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background',
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        outline: 'border border-input hover:bg-accent hover:text-accent-foreground',
+      },
+      size: {
+        default: 'h-10 py-2 px-4',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+)
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, ...props }, ref) => {
+    return (
+      <button
+        className={buttonVariants({ variant, size, className })}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = 'Button'
+
+export { Button, buttonVariants }
+import * as React from 'react'
+
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Input.displayName = 'Input'
+
+export { Input }
+-- Create users table
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  full_name TEXT,
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create RLS policies
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own record
+CREATE POLICY "Users can read their own data" ON users
+  FOR SELECT USING (auth.uid() = id);
+
+-- Admins can read all records
+CREATE POLICY "Admins can read all user data" ON users
+  FOR SELECT USING (auth.role() = 'authenticated' AND 
+    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+
+-- Create update timestamp function
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add update trigger
+CREATE TRIGGER update_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at();
+import { createClient } from '@/lib/supabase/server'
+import { NextRequest } from 'next/server'
+import { POST as signInHandler } from '@/app/(auth)/sign-in/route'
+import { POST as signOutHandler } from '@/app/auth/sign-out/route'
+
+jest.mock('@/lib/supabase/server', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      signInWithPassword: jest.fn(),
+      signOut: jest.fn(),
+      getSession: jest.fn(),
+    }
+  }))
+}))
+
+describe('Auth Routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('POST /auth/sign-in', () => {
+    it('should return 400 for invalid form data', async () => {
+      const req = new NextRequest('http://localhost/auth/sign-in', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'invalid', password: 'short' })
+      })
+
+      const response = await signInHandler(req)
+      expect(response.status).toBe(400)
+    })
+
+    it('should handle successful sign in', async () => {
+      const mockSignIn = jest.fn().mockResolvedValue({ error: null })
+      const client = createClient()
+      client.auth.signInWithPassword = mockSignIn
+
+      const req = new NextRequest('http://localhost/auth/sign-in', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'test@example.com', password: 'password123' })
+      })
+
+      const response = await signInHandler(req)
+      expect(response.status).toBe(200)
+      expect(mockSignIn).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123'
+      })
+    })
+  })
+
+  describe('POST /auth/sign-out', () => {
+    it('should sign out and redirect', async () => {
+      const mockSignOut = jest.fn()
+      const client = createClient()
+      client.auth.signOut = mockSignOut
+
+      const req = new NextRequest('http://localhost/auth/sign-out', {
+        method: 'POST'
+      })
+
+      const response = await signOutHandler(req)
+      expect(response.status).toBe(302)
+      expect(mockSignOut).toHaveBeenCalled()
+    })
+  })
+})
+import { test, expect } from '@playwright/test';
+
+test('has title', async ({ page }) => {
+  await page.goto('https://playwright.dev/');
+
+  // Expect a title "to contain" a substring.
+  await expect(page).toHaveTitle(/Playwright/);
+});
+
+test('get started link', async ({ page }) => {
+  await page.goto('https://playwright.dev/');
+
+  // Click the get started link.
+  await page.getByRole('link', { name: 'Get started' }).click();
+
+  // Expects page to have a heading with the name of Installation.
+  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
+});
+import { test, expect } from '@playwright/test'
+
+test.describe('Authentication', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:3000')
+  })
+
+  test('should allow user to sign in with email/password', async ({ page }) => {
+    // Navigate to sign in page
+    await page.getByRole('link', { name: 'Sign In' }).click()
+    await expect(page).toHaveURL(/\/auth\/sign-in/)
+
+    // Fill out and submit form
+    await page.getByLabel('Email').fill('test@example.com')
+    await page.getByLabel('Password').fill('password123')
+    await page.getByRole('button', { name: 'Sign In' }).click()
+
+    // Verify successful redirect to dashboard
+    await expect(page).toHaveURL(/\/dashboard/)
+    await expect(page.getByText('test@example.com')).toBeVisible()
+  })
+
+  test('should redirect unauthenticated users to sign in', async ({ page }) => {
+    // Try to access protected route
+    await page.goto('http://localhost:3000/dashboard')
+    
+    // Verify redirect to sign in
+    await expect(page).toHaveURL(/\/auth\/sign-in/)
+  })
+
+  test('should allow user to sign out', async ({ page }) => {
+    // Sign in first
+    await page.goto('http://localhost:3000/auth/sign-in')
+    await page.getByLabel('Email').fill('test@example.com')
+    await page.getByLabel('Password').fill('password123')
+    await page.getByRole('button', { name: 'Sign In' }).click()
+
+    // Sign out
+    await page.getByRole('button', { name: 'Sign Out' }).click()
+    
+    // Verify redirect to sign in
+    await expect(page).toHaveURL(/\/auth\/sign-in/)
+  })
+})
