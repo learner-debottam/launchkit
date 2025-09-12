@@ -28,9 +28,11 @@
     "@heroicons/react": "^2.2.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.0",
+    "@types/stripe": "^8.0.416",
     "next": "14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "stripe": "^18.5.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

@@ -18,9 +18,9 @@ describe('Auth Routes', () => {
     jest.clearAllMocks()
   })
 
-  describe('POST /auth/sign-in', () => {
+  describe('POST /sign-in', () => {
     it('should return 400 for invalid form data', async () => {
-      const req = new NextRequest('http://localhost/auth/sign-in', {
+      const req = new NextRequest('http://localhost/sign-in', {
         method: 'POST',
         body: JSON.stringify({ email: 'invalid', password: 'short' })
       })
@@ -34,7 +34,7 @@ describe('Auth Routes', () => {
       const client = createClient()
       client.auth.signInWithPassword = mockSignIn
 
-      const req = new NextRequest('http://localhost/auth/sign-in', {
+      const req = new NextRequest('http://localhost/sign-in', {
         method: 'POST',
         body: JSON.stringify({ email: 'test@example.com', password: 'password123' })
       })

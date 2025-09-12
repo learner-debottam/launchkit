@@ -18,6 +18,9 @@
       ],
       "@/types/*": [
         "types/*"
+      ],
+      "@/app/*": [
+        "app/*"
       ]
     },
     "strict": true,
