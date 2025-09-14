@@ -1,0 +1,40 @@
+diff --git package-lock.json package-lock.json
+index 2105b66..a0ca643 100644
+--- package-lock.json
++++ package-lock.json
+@@ -10,6 +10,7 @@
+       "license": "ISC",
+       "dependencies": {
+         "@heroicons/react": "^2.2.0",
++        "@stripe/stripe-js": "^7.9.0",
+         "@supabase/ssr": "^0.7.0",
+         "@supabase/supabase-js": "^2.39.0",
+         "@types/stripe": "^8.0.416",
+@@ -1482,6 +1483,15 @@
+         "@sinonjs/commons": "^3.0.0"
+       }
+     },
++    "node_modules/@stripe/stripe-js": {
++      "version": "7.9.0",
++      "resolved": "https://registry.npmjs.org/@stripe/stripe-js/-/stripe-js-7.9.0.tgz",
++      "integrity": "sha512-ggs5k+/0FUJcIgNY08aZTqpBTtbExkJMYMLSMwyucrhtWexVOEY1KJmhBsxf+E/Q15f5rbwBpj+t0t2AW2oCsQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=12.16"
++      }
++    },
+     "node_modules/@supabase/auth-js": {
+       "version": "2.71.1",
+       "resolved": "https://registry.npmjs.org/@supabase/auth-js/-/auth-js-2.71.1.tgz",
+diff --git package.json package.json
+index 8f7855a..98f431f 100644
+--- package.json
++++ package.json
+@@ -26,6 +26,7 @@
+   "type": "commonjs",
+   "dependencies": {
+     "@heroicons/react": "^2.2.0",
++    "@stripe/stripe-js": "^7.9.0",
+     "@supabase/ssr": "^0.7.0",
+     "@supabase/supabase-js": "^2.39.0",
+     "@types/stripe": "^8.0.416",
